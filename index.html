@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VM OS — All-in-One (VM Hacker) — v3</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --win-bg-1:#071029; --win-bg-2:#0f1724;
+  --glass: rgba(255,255,255,0.06);
+  --accent1:#7b61ff; --accent2:#00ffd5;
+  --text:#e9eef8;
+  --taskbar-height:56px;
+}
+*{box-sizing:border-box}
+html,body{height:100%; margin:0; font-family: "Segoe UI", Roboto, system-ui, -apple-system; color:var(--text);} 
+body{
+  background:
+    radial-gradient(800px 500px at 10% 15%, rgba(123,97,255,0.06), transparent),
+    radial-gradient(700px 400px at 90% 85%, rgba(0,255,213,0.03), transparent),
+    linear-gradient(180deg,var(--win-bg-1),var(--win-bg-2));
+  background-size:200% 200%;
+  animation:bgFloat 18s ease-in-out infinite alternate;
+  overflow:hidden;
+}
+@keyframes bgFloat{from{background-position:0% 0%}to{background-position:100% 100%}}
+
+/* basic layout */
+#desktop{position:fixed;inset:0;padding:18px;pointer-events:auto}
+.icons{display:flex;gap:14px;flex-wrap:wrap;width:320px}
+.icon{width:84px;text-align:center;cursor:pointer;user-select:none}
+.tile{width:66px;height:66px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#042;background:linear-gradient(135deg,var(--accent1),var(--accent2));box-shadow:0 8px 24px rgba(0,0,0,0.45)}
+
+#taskbar{position:fixed;left:0;right:0;bottom:0;height:var(--taskbar-height);background: linear-gradient(180deg, rgba(0,0,0,0.30), rgba(0,0,0,0.45));border-top: 1px solid rgba(255,255,255,0.03);display:flex;align-items:center;gap:12px;padding:8px 12px;z-index:8000;backdrop-filter: blur(8px)}
+.btn{padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#021018;border:none;cursor:pointer;font-weight:700}
+.btn.secondary{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,0.04)}
+.small{font-size:13px;padding:6px 8px;border-radius:8px}
+
+/* windows */
+.window{position:absolute;min-width:320px;min-height:180px;background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;box-shadow:0 30px 80px rgba(2,6,23,0.6);overflow:hidden;border:1px solid rgba(255,255,255,0.04);z-index:1000;display:flex;flex-direction:column}
+.titlebar{height:40px;display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:grab;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
+.titlebar .title{font-weight:700;font-size:14px;color:var(--text)}
+.titlebar .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+.win-btn{width:34px;height:28px;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.win-btn:hover{background: rgba(255,255,255,0.04);transform:translateY(-1px)}
+
+/* new small action buttons near title (terminal / upload) */
+.action-btn{width:34px;height:28px;border-radius:8px;background:linear-gradient(90deg,#222, #333);display:flex;align-items:center;justify-content:center;color:var(--text);font-weight:700;cursor:pointer;border:1px solid rgba(255,255,255,0.03)}
+.action-btn:hover{transform:translateY(-1px);}
+
+.content{padding:12px;flex:1;overflow:auto;background:rgba(0,0,0,0.02);color:var(--text)}
+.content iframe{width:100%;height:100%;border:0;border-radius:8px}
+.editor{width:100%;height:260px;border-radius:8px;padding:12px;font-family:ui-monospace,monospace;font-size:13px;resize:vertical;background:rgba(0,0,0,0.45);color:#eafcff;border:1px solid rgba(255,255,255,0.03)}
+.terminal{width:100%;height:160px;border-radius:8px;padding:8px;font-family:ui-monospace,monospace;font-size:13px;background:#02060a;color:#9fffe3;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+.img-wrap{border-radius:10px;padding:8px;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.03);min-height:240px;display:flex;align-items:center;justify-content:center}
+.img-wrap img{max-width:100%;max-height:520px;border-radius:8px}
+.hint{color:rgba(255,255,255,0.6);font-size:13px}
+.hidden{display:none}
+
+/* global close button fixed (kept for accessibility) */
+#globalCloseBtn{position:fixed;top:18px;right:18px;width:42px;height:42px;border-radius:10px;background:rgba(255,60,60,0.85);display:flex;align-items:center;justify-content:center;color:white;font-size:20px;cursor:pointer;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+
+/* responsive */
+@media (max-width:900px){.icons{max-width:100%}}
+
+/* simple light theme vars switch */
+.light-theme{--win-bg-1:#f4f7fb;--win-bg-2:#d9e8ff;--text:#07203b;--accent1:#6b8cff;--accent2:#55d1ff}
+
+/* ===== Kali Blue Dragon Theme (appended) ===== */
+.kali-mode {
+  --kali-bg-1: #001427;
+  --kali-bg-2: #012a4a;
+  --kali-accent: #00b2ff;
+  --kali-text: #cfefff;
+  --kali-glow: rgba(0,178,255,0.18);
+}
+.kali-wallpaper {
+  background: radial-gradient(1200px 600px at 20% 20%, rgba(0,178,255,0.06), transparent),
+              linear-gradient(180deg,var(--kali-bg-1),var(--kali-bg-2));
+  background-size:cover;
+  color:var(--kali-text);
+}
+.kali-topbar{
+  height:44px; display:flex; align-items:center; gap:12px; padding:8px 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));
+  backdrop-filter: blur(6px);
+  color:var(--kali-text);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.kali-dock{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;height:64px;padding:8px 14px;background:rgba(0,0,0,0.25);border-radius:14px;display:flex;gap:12px;align-items:center;z-index:90000}
+.kali-icon{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#013a5a,#003a6b);display:flex;align-items:center;justify-content:center;color:var(--kali-text);font-weight:700;cursor:pointer;box-shadow:0 8px 30px var(--kali-glow)}
+.kali-desktop { position:fixed; inset:0; padding:28px; z-index:8000; display:flex; gap:18px; align-items:flex-start; background: transparent; }
+.kali-boot-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:99999}
+.kali-boot-card{width:520px;padding:24px;border-radius:12px;background:linear-gradient(180deg, rgba(0,8,20,0.75), rgba(0,0,0,0.6));backdrop-filter: blur(6px);text-align:center;border:1px solid rgba(255,255,255,0.03)}
+.kali-logo{width:96px;height:96px;margin:0 auto 12px;border-radius:12px;background:linear-gradient(135deg,#0a4d7a,#002b4a);display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--kali-accent);font-size:34px;box-shadow:0 10px 40px rgba(0,178,255,0.06)}
+.kali-boot-bar{height:8px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden;margin-top:12px}
+.kali-boot-fill{height:8px;width:0%;background:linear-gradient(90deg,var(--kali-accent), #66e0ff);transition:width 0.35s}
+
+.kali-term { background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.4)); border-radius:8px; padding:12px; font-family: ui-monospace, monospace; color: #9fe9ff; height:100%; overflow:auto; }
+
+@media (max-width:900px){ .kali-dock{left:50%;transform:translateX(-50%);} }
+
+</style>
+</head>
+<body>
+
+<div id="globalCloseBtn" title="Close active window">✕</div>
+
+<!-- Boot Overlay -->
+<div id="bootOverlay" class="overlay">
+  <div class="splash" style="width:520px;max-width:92%;padding:20px;text-align:center;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));backdrop-filter: blur(6px);">
+    <div class="logo" style="width:72px;height:72px;border-radius:12px;margin:0 auto 10px;background:linear-gradient(135deg,var(--accent1),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;color:#021018;font-size:26px">VM</div>
+    <h1 style="margin:6px 0 6px">VM OS — Starting up</h1>
+    <p class="hint">Preparing your virtual environment…</p>
+    <div style="height:8px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;margin-top:12px">
+      <div id="bootBar" style="height:8px;width:0%;background:linear-gradient(90deg,var(--accent1),var(--accent2));transition:width 0.4s"></div>
+    </div>
+    <p style="margin-top:10px" id="bootText" class="hint">Loading modules...</p>
+  </div>
+</div>
+
+<!-- Kali root / overlays (hidden by default) -->
+<div id="kaliRoot" class="hidden" aria-hidden="true">
+  <!-- Boot overlay for Kali (hidden until triggered) -->
+  <div id="kaliBootOverlay" class="kali-boot-overlay hidden" aria-hidden="true">
+    <div class="kali-boot-card">
+      <div class="kali-logo">KD</div>
+      <h2 style="margin:8px 0;color:var(--kali-text)">Kali Linux — Dragon Mode</h2>
+      <p class="hint" id="kaliBootText">Initializing Kali environment…</p>
+      <div class="kali-boot-bar"><div id="kaliBootFill" class="kali-boot-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- Kali desktop container (rendered when in Kali mode) -->
+  <div id="kaliDesktop" class="kali-desktop hidden" aria-hidden="true">
+    <div style="flex:1">
+      <h2 style="color:var(--kali-text)">Kali — Desktop</h2>
+      <div id="kaliIcons" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">
+        <!-- icons appended dynamically -->
+      </div>
+    </div>
+
+    <!-- Right-side quick tools -->
+    <div style="width:320px">
+      <div style="background:rgba(255,255,255,0.02);padding:12px;border-radius:10px">
+        <strong style="color:var(--kali-text)">Kali Tools</strong>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+          <button class="btn small" onclick="openKaliTerminal()">Terminal</button>
+          <button class="btn small" onclick="openKaliNmap()">Nmap</button>
+          <button class="btn small" onclick="openKaliWireless()">Wireless Tools</button>
+          <button class="btn small" onclick="exitKaliMode()">Exit Kali</button>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div id="kaliDock" class="kali-dock" style="display:none">
+        <!-- dock populated by JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Login -->
+<div id="loginOverlay" class="overlay hidden">
+  <div class="login-card splash" style="width:420px;max-width:92%;padding:18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));backdrop-filter: blur(6px);">
+    <div class="logo" style="width:64px;height:64px;border-radius:12px;margin:0 auto 10px;background:linear-gradient(135deg,var(--accent1),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;color:#021018;font-size:22px">VM</div>
+    <h1 style="margin:6px 0 6px">Welcome</h1>
+    <p class="hint">Sign in to your VM OS</p>
+    <input id="username" class="input" placeholder="Enter your name (displayed on desktop)" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.03);color:var(--text)"/>
+    <button id="loginBtn" class="btn" style="margin-top:12px">Sign in</button>
+  </div>
+</div>
+
+<!-- Desktop -->
+<div id="desktop" aria-hidden="false">
+  <div style="display:flex; gap:20px;">
+    <div>
+      <div class="icons" id="desktopIcons">
+        <!-- icons appended here -->
+      </div>
+    </div>
+
+    <div style="flex:1">
+      <h2 id="welcomeTitle">VM OS</h2>
+      <p class="hint" id="welcomeHint">Open the Editor to run VM scripts. Use the taskbar search to browse the web.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Taskbar -->
+<div id="taskbar">
+  <div class="task-left">
+    <div id="startBtn" class="btn secondary">Start</div>
+  </div>
+
+  <div class="task-center">
+    <div id="taskSearch" class="row">
+      <select id="searchEngine" class="small">
+        <option value="google">Google</option>
+        <option value="bing">Bing</option>
+        <option value="ddg">DuckDuckGo</option>
+      </select>
+      <input id="taskQuery" placeholder="Search the web..." style="width:260px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04)" />
+      <button id="taskSearchBtn" class="btn small">Search</button>
+    </div>
+  </div>
+
+  <div class="task-right">
+    <div id="sysUser" class="hint">Guest</div>
+    <button id="heyKaliBtn" class="btn small" title="Switch to Kali">Hey Kali</button>
+    <div id="showDesktopBtn" class="btn secondary">Show Desktop</div>
+  </div>
+</div>
+
+<script>
+/* ========== State ========== */
+const state = {
+  z: 1000,
+  winCount: 0,
+  windows: {},
+  username: localStorage.getItem('vm_username') || null,
+  shortcuts: JSON.parse(localStorage.getItem('vm_shortcuts') || '[]'),
+  lastImage: localStorage.getItem('vm_last_image') || null
+};
+let window_active_id = null;
+
+/* ===== Helpers ===== */
+function $qs(sel, root=document){ return root.querySelector(sel); }
+function $ce(tag, props={}){ const el = document.createElement(tag); Object.assign(el, props); return el; }
+
+/* ===== Boot sequence ===== */
+const bootBar = $qs('#bootBar');
+const bootText = $qs('#bootText');
+const bootOverlay = $qs('#bootOverlay');
+const loginOverlay = $qs('#loginOverlay');
+async function bootSequence(){
+  const steps = [['Initializing UI',20], ['Loading Window Manager',40], ['Mounting File System',60], ['Starting Services',80], ['Ready',100]];
+  for (const s of steps){
+    bootText.textContent = s[0];
+    bootBar.style.width = s[1] + '%';
+    await new Promise(r=>setTimeout(r,200));
+  }
+  bootOverlay.classList.add('hidden');
+  if(!state.username) loginOverlay.classList.remove('hidden');
+  else postLogin();
+}
+bootSequence();
+
+/* ===== Login ===== */
+$qs('#loginBtn').addEventListener('click', ()=>{
+  const name = $qs('#username').value.trim();
+  if(!name){ alert('Please enter a name'); return; }
+  state.username = name;
+  localStorage.setItem('vm_username', name);
+  $qs('#sysUser').textContent = name;
+  loginOverlay.classList.add('hidden');
+  postLogin();
+});
+
+function postLogin(){
+  $qs('#welcomeTitle').textContent = `Welcome, ${state.username || 'Guest'}`;
+  $qs('#welcomeHint').textContent = 'Double-click apps to open. Run VM scripts in Editor.';
+  renderShortcuts();
+  // open editor automatically to be helpful
+  openEditor();
+}
+
+/* ===== Shortcuts rendering ===== */
+function renderShortcuts(){
+  const container = $qs('#desktopIcons');
+  container.innerHTML = '';
+  const defaultApps = [
+    {id:'editor',label:'Editor'},
+    {id:'browser',label:'Browser'},
+    {id:'image',label:'Image'},
+    {id:'explorer',label:'Explorer'},
+    {id:'terminal',label:'Terminal'},
+    {id:'three',label:'3D Demo'},
+    {id:'store',label:'App Store'},
+    {id:'settings',label:'Settings'}
+  ,
+    {id:'codeme',label:'Code Me'}];
+  const apps = defaultApps.concat(state.shortcuts);
+  apps.forEach(a=>{
+    const div = $ce('div',{className:'icon'});
+    div.innerHTML = `<div class="tile">${a.label.slice(0,2).toUpperCase()}</div><label style="display:block;margin-top:8px;font-size:13px;color:rgba(255,255,255,0.9)">${a.label}</label>`;
+    div.ondblclick = ()=> openApp(a.id);
+    container.appendChild(div);
+  });
+}
+
+/* ===== Window manager ===== */
+function createWindow(opts){
+  state.winCount++;
+  const id = 'win_' + state.winCount;
+  const win = $ce('div',{className:'window', id});
+  win.style.left = (80 + state.winCount*18) + 'px';
+  win.style.top  = (60 + state.winCount*16) + 'px';
+  win.style.width = opts.width || '760px';
+  win.style.height = opts.height || '480px';
+  win.style.zIndex = ++state.z;
+  win.dataset.app = opts.app || 'app';
+
+  // Titlebar with Terminal (T) and Upload (U)
+  const titleHTML =
+    `<div class="titlebar" data-win="${id}">
+       <div class="title">${escapeHtml(opts.title || 'Window')}</div>
+       <div class="controls">
+         <div class="action-btn" data-action="open-term" title="Open Terminal">T</div>
+         <label class="action-btn" title="Upload Package (HTML/ZIP/TXT)" style="display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+           <input type="file" accept=".html,.htm,.txt,.json,.zip,image/*" style="position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer" data-upload />
+           <span style="pointer-events:none">U</span>
+         </label>
+         <div class="win-btn" data-action="min">—</div>
+         <div class="win-btn" data-action="max">▢</div>
+         <div class="win-btn" data-action="close">✕</div>
+       </div>
+     </div>`;
+
+  // content container
+  win.innerHTML = titleHTML + `<div class="content">${opts.content || ''}</div>`;
+  document.body.appendChild(win);
+  state.windows[id] = win;
+
+  // wire controls
+  win.querySelectorAll('.win-btn').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      const act = b.dataset.action;
+      if(act === 'min') minimizeWindow(id);
+      if(act === 'max') maximizeWindow(id);
+      if(act === 'close') closeWindow(id);
+      e.stopPropagation();
+    });
+  });
+
+  // Terminal button
+  const termBtn = win.querySelector('[data-action="open-term"]');
+  if(termBtn) termBtn.addEventListener('click', (e)=>{
+    openTerminal();
+    e.stopPropagation();
+  });
+
+  // Upload handling: SAFE and robust
+  const uploadInput = win.querySelector('input[data-upload]');
+  if(uploadInput){
+    uploadInput.addEventListener('change', async (ev)=>{
+      const f = ev.target.files?.[0];
+      if(!f) return;
+      try {
+        // Prefer text() when available
+        let text = '';
+        if(typeof f.text === 'function'){
+          text = await f.text();
+        } else {
+          text = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = rej;
+            fr.readAsText(f);
+          });
+        }
+
+        const cont = win.querySelector('.content');
+        // If file looks like HTML, load into an iframe via srcdoc to avoid parsing as part of main document
+        const looksLikeHtml = /\.html?$/.test(f.name.toLowerCase()) || text.trim().startsWith('<');
+        if(looksLikeHtml){
+          // Create sandboxed iframe and set srcdoc. This avoids "Unexpected token '<'" errors.
+          const iframe = document.createElement('iframe');
+          iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+          iframe.style.width = '100%';
+          iframe.style.height = '100%';
+          iframe.style.border = '0';
+          iframe.srcdoc = text;
+          cont.innerHTML = '';
+          cont.appendChild(iframe);
+          logToWindow(win, `Loaded HTML package: ${f.name} (rendered in iframe)`);
+        } else if(f.type.startsWith('image/')){
+          // If image, show in an img tag
+          const dataURL = await toDataURL(f);
+          state.lastImage = dataURL;
+          localStorage.setItem('vm_last_image', dataURL);
+          const imgWrap = document.createElement('div');
+          imgWrap.className = 'img-wrap';
+          imgWrap.innerHTML = `<img src="${dataURL}" alt="${escapeHtml(f.name)}">`;
+          cont.innerHTML = '';
+          cont.appendChild(imgWrap);
+          logToWindow(win, `Loaded image: ${f.name}`);
+        } else {
+          // Otherwise treat as plain text
+          cont.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(text)}</pre>`;
+          logToWindow(win, `Loaded package content: ${f.name}`);
+        }
+      } catch(err){
+        logToWindow(win, `Upload error: ${err.message || err}`);
+      } finally {
+        ev.target.value = '';
+      }
+    });
+  }
+
+  // focus handling
+  win.addEventListener('mousedown', ()=> { win.style.zIndex = ++state.z; registerActiveWindow(id); });
+  win.addEventListener('focusin', ()=> { win.style.zIndex = ++state.z; registerActiveWindow(id); });
+
+  // drag + resize
+  const bar = win.querySelector('.titlebar');
+  makeDraggable(win, bar);
+  addResizeHandle(win);
+
+  // accessibility
+  win.tabIndex = 0;
+  registerActiveWindow(id);
+  return id;
+}
+
+function registerActiveWindow(id){
+  window_active_id = id;
+  for(const k in state.windows){
+    state.windows[k].classList.toggle('active', k === id);
+  }
+}
+function closeWindow(id){
+  const w = state.windows[id];
+  if(!w) return;
+  w.remove();
+  delete state.windows[id];
+  if(window_active_id === id) window_active_id = null;
+}
+function minimizeWindow(id){
+  const w = state.windows[id];
+  if(!w) return;
+  w.style.display = 'none';
+}
+function maximizeWindow(id){
+  const w = state.windows[id];
+  if(!w) return;
+  if(!w.dataset.maxed){
+    w.dataset.prev = JSON.stringify({left:w.style.left, top:w.style.top, width:w.style.width, height:w.style.height});
+    w.style.left = '8px'; w.style.top = '8px';
+    w.style.width = (window.innerWidth - 16) + 'px';
+    w.style.height = (window.innerHeight - (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--taskbar-height')) || 56) - 24) + 'px';
+    w.dataset.maxed = '1';
+  } else {
+    const p = JSON.parse(w.dataset.prev || '{}');
+    w.style.left = p.left || w.style.left;
+    w.style.top = p.top || w.style.top;
+    w.style.width = p.width || w.style.width;
+    w.style.height = p.height || w.style.height;
+    delete w.dataset.maxed;
+  }
+}
+function makeDraggable(winEl, handle){
+  let dragging=false, ox=0, oy=0;
+  handle.addEventListener('pointerdown', (ev)=>{
+    if (winEl.dataset.maxed) return;
+    dragging = true; ox = ev.clientX - winEl.offsetLeft; oy = ev.clientY - winEl.offsetTop;
+    handle.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+  });
+  window.addEventListener('pointermove', (ev)=>{
+    if(!dragging) return;
+    winEl.style.left = (ev.clientX - ox) + 'px';
+    winEl.style.top = (ev.clientY - oy) + 'px';
+  });
+  window.addEventListener('pointerup', ()=>{ dragging = false; });
+}
+function addResizeHandle(winEl){
+  const h = document.createElement('div');
+  h.style.width='14px'; h.style.height='14px'; h.style.position='absolute';
+  h.style.right='8px'; h.style.bottom='8px'; h.style.cursor='nwse-resize';
+  winEl.appendChild(h);
+  let resizing=false, sx=0, sy=0, sw=0, sh=0;
+  h.addEventListener('pointerdown', (e)=>{
+    resizing=true; sx=e.clientX; sy=e.clientY; sw=winEl.offsetWidth; sh=winEl.offsetHeight; h.setPointerCapture(e.pointerId); e.stopPropagation();
+  });
+  window.addEventListener('pointermove', (e)=>{
+    if(!resizing) return;
+    winEl.style.width = (sw + (e.clientX - sx)) + 'px';
+    winEl.style.height = (sh + (e.clientY - sy)) + 'px';
+  });
+  window.addEventListener('pointerup', ()=>{ resizing=false; });
+}
+
+/* ===== Utilities ===== */
+function escapeHtml(s){
+  if(!s && s !== 0) return '';
+  return String(s).replace(/[&<>"']/g, (m)=>{
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+  });
+}
+function logToWindow(winEl, msg){
+  const out = winEl.querySelector('.terminal') || winEl.querySelector('.content') || winEl;
+  const d = document.createElement('div'); d.textContent = msg;
+  out.appendChild(d);
+  if(out.scrollTop !== undefined) out.scrollTop = out.scrollHeight;
+}
+function toDataURL(file){
+  return new Promise((res, rej)=>{
+    const fr = new FileReader();
+    fr.onload = ()=> res(fr.result);
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+}
+
+/* ===== Built-in apps ===== */
+function openApp(id){
+  switch(id){
+    case 'editor': openEditor(); break;
+    case 'browser': openBrowser('https://example.com'); break;
+    case 'image': openImageViewer(state.lastImage); break;
+    case 'explorer': openExplorer(); break;
+    case 'terminal': openTerminal(); break;
+    case 'three': openThreeDemo(); break;
+    case 'store': openStore(); break;
+    case 'settings': openSettings(); break;
+    case 'codeme': openCodeMe(); break;
+    default: alert('App not found: ' + id); break;
+  }
+}
+
+/* ===== Editor ===== */
+function openEditor(){
+  const content = `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button id="runScriptBtn" class="btn">Run Script</button>
+        <button id="saveScriptBtn" class="btn secondary">Save Script</button>
+        <button id="loadScriptBtn" class="btn secondary">Load Script</button>
+      </div>
+      <textarea id="scriptBox" class="editor">// VM commands example
+/image:upload/
+/image:show/
+/image:center/
+/image:left/
+/image:right/
+/image:link https://example.com/cat.png/
+/frame:image/
+/window/win11/
+/iframe https://example.com/
+/3j/
+</textarea>
+      <div style="margin-top:8px" class="terminal" id="editorOut">[output]</div>
+    </div>
+  `;
+  const winId = createWindow({title:'Script Editor', width:'820px', height:'560px', app:'editor', content});
+  const win = state.windows[winId];
+  const runBtn = win.querySelector('#runScriptBtn');
+  const saveBtn = win.querySelector('#saveScriptBtn');
+  const loadBtn = win.querySelector('#loadScriptBtn');
+  const scriptBox = win.querySelector('#scriptBox');
+  const out = win.querySelector('#editorOut');
+
+  runBtn.onclick = async () => {
+    out.innerHTML = '';
+    logToWindow(win, '--- VM START ---');
+    const script = scriptBox.value;
+    await runScript(script, out);
+    logToWindow(win, '--- VM STOP ---');
+  };
+  saveBtn.onclick = () => {
+    const key = prompt('Save script name:', 'script_' + Date.now());
+    if(!key) return;
+    localStorage.setItem('vm_script_'+key, scriptBox.value);
+    alert('Saved: vm_script_' + key);
+  };
+  loadBtn.onclick = () => {
+    let keys = Object.keys(localStorage).filter(k=>k.startsWith('vm_script_'));
+    if(keys.length === 0){ alert('No saved scripts'); return; }
+    const pick = prompt('Available: ' + keys.join(',') + '\nType key to load:');
+    if(!pick) return;
+    const val = localStorage.getItem(pick);
+    if(val) scriptBox.value = val;
+  };
+}
+
+/* ===== Browser ===== */
+function openBrowser(url){
+  const content = `<div style="display:flex;flex-direction:column;height:100%"><div style="display:flex;gap:8px;margin-bottom:8px"><input id="addr" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04)" value="${escapeHtml(url)}"><button id="goBtn" class="btn">Go</button></div><div style="flex:1; height:100%;"><iframe id="browserFrame" src="${escapeHtml(url)}"></iframe></div></div>`;
+  const winId = createWindow({title:'Web Browser', width:'980px', height:'620px', app:'browser', content});
+  const win = state.windows[winId];
+  const goBtn = win.querySelector('#goBtn');
+  const addr = win.querySelector('#addr');
+  const iframe = win.querySelector('#browserFrame');
+  goBtn.onclick = ()=> loadUrlInIframe(addr.value, iframe, winId);
+  iframe.addEventListener('load', ()=>{ /* loaded */ });
+  return winId;
+}
+function loadUrlInIframe(url, iframeEl, winId){
+  try {
+    iframeEl.src = url;
+    setTimeout(()=> {
+      const blockedHosts = ['google.com','bing.com','youtube.com','accounts.google.com'];
+      if(blockedHosts.some(h=>url.includes(h))){
+        // open new tab and notify user
+        window.open(url, '_blank');
+        const win = state.windows[winId];
+        if(win) {
+          win.querySelector('.content').innerHTML = `<div class="hint">Page opened in new tab due to iframe restrictions: <a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></div>`;
+        }
+      }
+    }, 600);
+  } catch(e){
+    window.open(url, '_blank');
+  }
+}
+
+/* ===== Image Viewer ===== */
+function openImageViewer(initial){
+  const content = `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="imgUpload" type="file" accept="image/*" />
+        <button id="showBtn" class="btn">Show</button>
+        <button id="frameBtn" class="btn secondary">Frame</button>
+        <button id="leftBtn" class="btn secondary">Left</button>
+        <button id="centerBtn" class="btn secondary">Center</button>
+        <button id="rightBtn" class="btn secondary">Right</button>
+      </div>
+      <div id="imgWrap" class="img-wrap">${ initial ? `<img src="${escapeHtml(initial)}">` : '<div class="hint">Drop an image here or click upload</div>' }</div>
+    </div>`;
+  const winId = createWindow({title:'Image Viewer', width:'760px', height:'520px', app:'image', content});
+  const win = state.windows[winId];
+  const upload = win.querySelector('#imgUpload');
+  const showBtn = win.querySelector('#showBtn');
+  const frameBtn = win.querySelector('#frameBtn');
+  const leftBtn = win.querySelector('#leftBtn'); const centerBtn = win.querySelector('#centerBtn'); const rightBtn = win.querySelector('#rightBtn');
+  const wrap = win.querySelector('#imgWrap');
+
+  upload.onchange = async (e) => {
+    const f = e.target.files?.[0];
+    if(!f) return;
+    const data = await toDataURL(f);
+    state.lastImage = data; localStorage.setItem('vm_last_image', data);
+    wrap.innerHTML = `<img src="${data}">`;
+  };
+
+  showBtn.onclick = ()=> {
+    if(state.lastImage){
+      wrap.innerHTML = `<img src="${state.lastImage}">`;
+    } else alert('No image uploaded yet.');
+  };
+
+  frameBtn.onclick = ()=> {
+    const img = wrap.querySelector('img');
+    if(!img) return alert('No image to frame');
+    img.style.border = '6px solid rgba(255,255,255,0.9)';
+    img.style.borderRadius = '12px';
+  };
+  leftBtn.onclick = ()=> wrap.style.textAlign='left';
+  centerBtn.onclick = ()=> wrap.style.textAlign='center';
+  rightBtn.onclick = ()=> wrap.style.textAlign='right';
+
+  wrap.addEventListener('dragover', e=>{ e.preventDefault(); });
+  wrap.addEventListener('drop', async e=>{ e.preventDefault(); const f = e.dataTransfer.files?.[0]; if(f){ const d = await toDataURL(f); state.lastImage=d; localStorage.setItem('vm_last_image', d); wrap.innerHTML=`<img src="${d}">`; } });
+}
+
+/* ===== File Explorer ===== */
+function openExplorer(){
+  const content = `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button id="refreshFiles" class="btn">Refresh</button>
+        <button id="newText" class="btn secondary">New Text File</button>
+        <button id="downloadAll" class="btn secondary">Download All</button>
+        <input id="uploadFile" type="file" style="display:none">
+        <button id="uploadBtn" class="btn secondary">Upload File</button>
+      </div>
+      <div id="fileList" class="file-list" style="overflow:auto;flex:1"></div>
+    </div>`;
+  const winId = createWindow({title:'File Explorer', width:'560px', height:'460px', app:'explorer', content});
+  const win = state.windows[winId];
+
+  const refresh = win.querySelector('#refreshFiles');
+  const newText = win.querySelector('#newText');
+  const list = win.querySelector('#fileList');
+  const uploadInput = win.querySelector('#uploadFile');
+  const uploadBtn = win.querySelector('#uploadBtn');
+  const downloadAll = win.querySelector('#downloadAll');
+
+  refresh.onclick = ()=> loadFileList(list);
+  newText.onclick = ()=>{
+    const name = prompt('File name (e.g., note1.txt):','note_'+Date.now()+'.txt');
+    if(!name) return;
+    const content = prompt('File content:','Hello from VM OS');
+    localStorage.setItem('file_'+name, content || '');
+    loadFileList(list);
+  };
+  uploadBtn.onclick = ()=> uploadInput.click();
+  uploadInput.onchange = async (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    const text = await (f.text ? f.text() : new Promise(r => { const fr = new FileReader(); fr.onload = ()=> r(fr.result); fr.readAsText(f); }));
+    localStorage.setItem('file_'+f.name, text);
+    loadFileList(list);
+    alert('Uploaded: ' + f.name);
+  };
+  downloadAll.onclick = ()=> {
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith('file_')){
+        const name = k.slice(5);
+        const v = localStorage.getItem(k);
+        downloadTextFile(name, v);
+      }
+    }
+  };
+  loadFileList(list);
+}
+
+function loadFileList(container){
+  container.innerHTML = '';
+  const keys = Object.keys(localStorage).filter(k=>k.startsWith('file_'));
+  if(keys.length === 0){ container.innerHTML = '<div class="hint">No files found</div>'; return; }
+  keys.forEach(k=>{
+    const name = k.slice(5);
+    const val = localStorage.getItem(k);
+    const div = $ce('div',{className:'file-item'});
+    div.style.display = 'flex'; div.style.justifyContent = 'space-between'; div.style.alignItems = 'center'; div.style.padding = '8px'; div.style.background = 'rgba(255,255,255,0.02)'; div.style.borderRadius = '8px'; div.style.marginBottom = '8px';
+    div.innerHTML = `<div style="flex:1"><strong>${escapeHtml(name)}</strong><div class="hint" style="margin-top:4px">${escapeHtml((val||'').slice(0,120))}</div></div>
+      <div style="display:flex;gap:6px"><button class="btn secondary" data-open="${k}">Open</button><button class="btn secondary" data-del="${k}">Delete</button><button class="btn secondary" data-dl="${k}">Download</button></div>`;
+    container.appendChild(div);
+  });
+  container.querySelectorAll('[data-open]').forEach(b=>{
+    b.onclick = (e) => {
+      const k = e.target.dataset.open;
+      const v = localStorage.getItem(k) || '';
+      openNotepadWithContent(v, k.slice(5));
+    };
+  });
+  container.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick = (e) => { const k=e.target.dataset.del; if(confirm('Delete '+k+'?')){ localStorage.removeItem(k); loadFileList(container); } };
+  });
+  container.querySelectorAll('[data-dl]').forEach(b=>{
+    b.onclick = (e) => {
+      const k=e.target.dataset.dl; const name=k.slice(5); const v=localStorage.getItem(k)||''; downloadTextFile(name, v);
+    };
+  });
+}
+
+function openNotepadWithContent(text='', title='Notepad'){
+  const content = `<div style="display:flex;flex-direction:column;height:100%"><textarea id="noteArea" style="flex:1;border-radius:8px;padding:12px">${escapeHtml(text)}</textarea><div style="display:flex;gap:8px;margin-top:8px"><button id="saveNote" class="btn">Save to file</button></div></div>`;
+  const winId = createWindow({title:title, width:'640px', height:'420px', app:'notepad', content});
+  const win = state.windows[winId];
+  win.querySelector('#saveNote').onclick = ()=>{
+    const val = win.querySelector('#noteArea').value;
+    const fname = prompt('File name to save as:','note_'+Date.now()+'.txt');
+    if(!fname) return;
+    localStorage.setItem('file_'+fname, val);
+    alert('Saved: ' + fname);
+  };
+}
+function downloadTextFile(name, text){
+  const blob = new Blob([text], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ===== Terminal ===== */
+function openTerminal(){
+  const content = `<div style="display:flex;flex-direction:column;height:100%"><div id="termOut" class="terminal">Welcome to VM Terminal</div><div style="display:flex;gap:8px;margin-top:8px"><input id="termCmd" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04)" placeholder="type command (help)"><button id="runTerm" class="btn">Run</button></div></div>`;
+  const winId = createWindow({title:'Terminal', width:'720px', height:'420px', app:'terminal', content});
+  const win = state.windows[winId];
+  const out = win.querySelector('#termOut');
+  const cmd = win.querySelector('#termCmd');
+  const run = win.querySelector('#runTerm');
+  run.onclick = ()=> {
+    const c = cmd.value.trim();
+    cmd.value = '';
+    termExecute(c, out);
+  };
+  return winId;
+}
+function termExecute(cmd, outElem){
+  if(!cmd) return;
+  const line = document.createElement('div'); line.textContent = '> ' + cmd; outElem.appendChild(line);
+  outElem.scrollTop = outElem.scrollHeight;
+  const parts = cmd.split(' ');
+  const op = parts[0].toLowerCase();
+  if(op === 'help'){
+    logOut(outElem,'Commands: help, echo <text>, ls, cat <file>, open <app>, runscript <name>, clear, date, whoami');
+  } else if(op === 'echo'){
+    logOut(outElem, parts.slice(1).join(' '));
+  } else if(op === 'ls'){
+    const files = Object.keys(localStorage).filter(k=>k.startsWith('file_')).map(k=>k.slice(5));
+    logOut(outElem, (files.length?files.join(', '):'[no files]'));
+  } else if(op === 'cat'){
+    const name = parts.slice(1).join(' ');
+    const k = 'file_' + name;
+    logOut(outElem, localStorage.getItem(k) || '[not found]');
+  } else if(op === 'open'){
+    const app = parts[1];
+    openApp(app);
+    logOut(outElem, 'Opening ' + app);
+  } else if(op === 'runscript'){
+    const key = 'vm_script_' + parts[1];
+    const script = localStorage.getItem(key);
+    if(script){ runScript(script, outElem); } else logOut(outElem, 'script not found: ' + key);
+  } else if(op === 'clear'){
+    outElem.innerHTML = '';
+  } else if(op === 'date'){
+    logOut(outElem, new Date().toString());
+  } else if(op === 'whoami'){
+    logOut(outElem, state.username || 'Guest');
+  } else logOut(outElem, 'Unknown command: ' + op);
+}
+function logOut(outEl, msg){
+  if(!outEl){ console.log(msg); return; }
+  const d = document.createElement('div'); d.textContent = msg; outEl.appendChild(d); outEl.scrollTop = outEl.scrollHeight;
+}
+
+/* ===== 3D Demo (load once) ===== */
+function openThreeDemo(){
+  const id = createWindow({title:'Three.js Demo', width:'720px', height:'520px', app:'three', content:`<div id="three_${Date.now()}" style="width:100%;height:100%"></div>`});
+  setTimeout(()=> initThree(state.windows[id].querySelector('div[id^=three_]')),80);
+}
+function initThree(container){
+  try{
+    if(window.THREE){ startThree(container); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+    script.onload = ()=> startThree(container);
+    document.body.appendChild(script);
+  }catch(e){ console.error(e); }
+}
+function startThree(container){
+  const width = container.clientWidth, height = container.clientHeight;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, width/height, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(width, height); container.appendChild(renderer.domElement);
+  const geometry = new THREE.BoxGeometry();
+  const material = new THREE.MeshNormalMaterial();
+  const cube = new THREE.Mesh(geometry, material);
+  scene.add(cube); camera.position.z = 3;
+  function animate(){ requestAnimationFrame(animate); cube.rotation.x += 0.01; cube.rotation.y += 0.01; renderer.render(scene,camera); }
+  animate();
+}
+
+/* ===== Store & Settings ===== */
+function openStore(){
+  const apps = [
+    {id:'todo',label:'ToDo App',desc:'Simple notes and tasks'},
+    {id:'paint',label:'Paint',desc:'Draw on canvas'},
+    {id:'calc',label:'Calculator',desc:'Basic calculator'},
+  ];
+  const content = `<div style="display:flex;flex-direction:column;height:100%"><div style="display:flex;gap:8px;margin-bottom:8px"><strong>App Store</strong></div><div id="storeList" style="overflow:auto;flex:1"></div></div>`;
+  const winId = createWindow({title:'App Store', width:'720px', height:'520px', app:'store', content});
+  const win = state.windows[winId];
+  const list = win.querySelector('#storeList');
+  apps.forEach(a=>{
+    const d = document.createElement('div'); d.style.padding='10px'; d.style.borderBottom='1px solid rgba(255,255,255,0.03)';
+    d.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${escapeHtml(a.label)}</strong><div class="hint">${escapeHtml(a.desc)}</div></div><div><button class="btn small" data-install="${escapeHtml(a.id)}">Install</button></div></div>`;
+    list.appendChild(d);
+  });
+  list.querySelectorAll('[data-install]').forEach(b=>{
+    b.onclick = (e)=>{
+      const id = e.target.dataset.install;
+      state.shortcuts.push({id:id,label: id.charAt(0).toUpperCase() + id.slice(1)});
+      localStorage.setItem('vm_shortcuts', JSON.stringify(state.shortcuts));
+      renderShortcuts();
+      alert('Installed: ' + id);
+    };
+  });
+}
+
+function openSettings(){
+  const content = `<div style="display:flex;flex-direction:column;height:100%"><div style="display:flex;gap:8px;margin-bottom:8px"><button id="themeDark" class="btn small">Dark</button><button id="themeLight" class="btn small">Light</button><input id="bgUpload" type="file" accept="image/*" /></div><div class="hint">Upload a custom wallpaper to set as background.</div></div>`;
+  const winId = createWindow({title:'Settings', width:'520px', height:'320px', app:'settings', content});
+  const win = state.windows[winId];
+  win.querySelector('#themeDark').onclick = ()=> applyTheme('dark');
+  win.querySelector('#themeLight').onclick = ()=> applyTheme('light');
+  win.querySelector('#bgUpload').onchange = async (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    const d = await toDataURL(f);
+    document.body.style.backgroundImage = `url(${d})`;
+    document.body.style.backgroundSize = 'cover';
+    localStorage.setItem('vm_wallpaper', d);
+  };
+  const saved = localStorage.getItem('vm_wallpaper');
+  if(saved) document.body.style.backgroundImage = `url(${saved})`;
+}
+function applyTheme(t){ if(t==='light') document.documentElement.classList.add('light-theme'); else document.documentElement.classList.remove('light-theme'); }
+
+/* ===== VM Script Runner ===== */
+async function runScript(script, outEl){
+  const lines = script.replace(/\r/g,'').split('\n').map(l=>l.trim()).filter(Boolean);
+  for(const raw of lines){
+    if(raw.startsWith('//')) continue;
+    logOut(outEl, '> ' + raw);
+    if(raw.startsWith('/image:upload/')){
+      openImageViewer();
+      logToWindow(document.body, 'Image Viewer opened for upload.');
+      continue;
+    }
+    if(raw.startsWith('/image:show/')){
+      if(state.lastImage){ openImageViewer(state.lastImage); logToWindow(document.body,'Showing last uploaded image.'); }
+      else logToWindow(document.body,'No image found. Use /image:upload/ or /image:link <url>/');
+      continue;
+    }
+    if(raw.startsWith('/image:center/')){ ensureImageWindowOpen(); alignImage('center'); logToWindow(document.body,'Image aligned center'); continue; }
+    if(raw.startsWith('/image:left/')){ ensureImageWindowOpen(); alignImage('left'); logToWindow(document.body,'Image aligned left'); continue; }
+    if(raw.startsWith('/image:right/')){ ensureImageWindowOpen(); alignImage('right'); logToWindow(document.body,'Image aligned right'); continue; }
+    if(raw.startsWith('/image:link')){
+      const url = raw.replace('/image:link','').replace(/\//g,'').trim();
+      if(!url){ logToWindow(document.body,'No URL provided'); continue; }
+      state.lastImage = url; localStorage.setItem('vm_last_image', url);
+      openImageViewer(url); logToWindow(document.body,'Image loaded from link: ' + url); continue;
+    }
+    if(raw.startsWith('/frame:image/')){
+      let framed=false;
+      for(const id in state.windows){
+        const w = state.windows[id];
+        const img = w.querySelector('.img-wrap img');
+        if(img){ img.style.border='6px solid rgba(255,255,255,0.9)'; img.style.borderRadius='12px'; framed=true; }
+      }
+      if(framed) logToWindow(document.body,'Frame applied'); else logToWindow(document.body,'No image to frame');
+      continue;
+    }
+    if(raw.startsWith('/window/win11/') || raw.startsWith('/window/microsoft run/')){
+      openBrowser('https://win11.blueedge.me'); logToWindow(document.body,'Launching Windows 11 demo'); continue;
+    }
+    if(raw.startsWith('/iframe')){
+      const url = raw.replace('/iframe','').replace(/\//g,'').trim();
+      if(!url){ logToWindow(document.body,'No iframe URL provided'); continue; }
+      openBrowser(url); logToWindow(document.body,'Opened iframe URL ' + url); continue;
+    }
+    if(raw.startsWith('/3j/')){
+      openThreeDemo(); logToWindow(document.body,'Opened Three.js demo'); continue;
+    }
+    logToWindow(document.body, 'Unknown command: ' + raw);
+  }
+}
+function ensureImageWindowOpen(){ let found=false; for(const id in state.windows){ const w=state.windows[id]; if(w.dataset.app==='image'){ found=true; w.style.display='block'; w.style.zIndex = ++state.z; registerActiveWindow(id); break; } } if(!found) openImageViewer(); }
+function alignImage(dir){ for(const id in state.windows){ const w = state.windows[id]; const wrap = w.querySelector('.img-wrap'); if(wrap){ wrap.style.textAlign = dir; break; } } }
+
+/* ===== Search / Start menu ===== */
+const searchProviders = {
+  google: q => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+  bing: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
+  ddg: q => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`
+};
+$qs('#taskSearchBtn').addEventListener('click', ()=>{
+  const q = $qs('#taskQuery').value.trim();
+  const eng = $qs('#searchEngine').value;
+  if(!q) return;
+  const url = searchProviders[eng](q);
+  const winId = openBrowser(url);
+  setTimeout(()=> {
+    if(url.includes('google.com') || url.includes('bing.com')){
+      window.open(url, '_blank');
+      const win = state.windows[winId];
+      if(win) win.querySelector('.content').innerHTML = `<div class="hint">Opened in new tab due to iframe restrictions: <a href="${escapeHtml(url)}" target="_blank">${escapeHtml(url)}</a></div>`;
+    }
+  },700);
+});
+
+/* Start menu improved: don't auto-close when clicking inside */
+$qs('#startBtn').addEventListener('click',(e)=>{
+  e.stopPropagation();
+  const menu = $ce('div');
+  menu.style.position='fixed'; menu.style.left='18px'; menu.style.bottom='72px'; menu.style.width='300px'; menu.style.background='rgba(0,0,0,0.45)';
+  menu.style.border='1px solid rgba(255,255,255,0.03)'; menu.style.borderRadius='12px'; menu.style.padding='12px'; menu.style.zIndex=99999;
+  menu.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px"><button class="btn small" id="startEditor">Open Editor</button><button class="btn small" id="startExplorer">File Explorer</button><button class="btn small" id="startSettings">Settings</button></div>`;
+  document.body.appendChild(menu);
+  menu.addEventListener('click', (ev)=> ev.stopPropagation());
+  setTimeout(()=>{ document.addEventListener('click', ()=> menu.remove(), {once:true}); },10);
+  menu.querySelector('#startEditor').onclick = ()=>{ openEditor(); menu.remove(); };
+  menu.querySelector('#startExplorer').onclick = ()=>{ openExplorer(); menu.remove(); };
+  menu.querySelector('#startSettings').onclick = ()=>{ openSettings(); menu.remove(); };
+});
+
+/* Show desktop */
+$qs('#showDesktopBtn').addEventListener('click', ()=>{ for(const id in state.windows){ state.windows[id].style.display='none'; } });
+
+/* Init from storage */
+(function initFromStorage(){
+  try{ state.shortcuts = JSON.parse(localStorage.getItem('vm_shortcuts') || '[]'); } catch(e){ state.shortcuts = []; }
+  renderShortcuts();
+  if(state.username) $qs('#sysUser').textContent = state.username;
+})();
+
+/* Global close button */
+document.addEventListener('mousedown', (e)=>{
+  const win = e.target.closest('.window');
+  if(win){ window_active_id = win.id; win.style.zIndex = ++state.z; }
+});
+$qs('#globalCloseBtn').addEventListener('click', ()=>{
+  if(window_active_id && state.windows[window_active_id]){
+    state.windows[window_active_id].remove();
+    delete state.windows[window_active_id];
+    window_active_id = null;
+  }
+});
+
+/* Expose quick window openers to console */
+window.openEditor = openEditor;
+window.openBrowser = openBrowser;
+window.openImageViewer = openImageViewer;
+window.openExplorer = openExplorer;
+window.openTerminal = openTerminal;
+window.openThreeDemo = openThreeDemo;
+window.openStore = openStore;
+window.openSettings = openSettings;
+
+function openCodeMe(){
+  const content = `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <textarea id="codeArea" class="editor" style="flex:1;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="runCodeBtn" class="btn">Run</button>
+        <button id="saveCodeBtn" class="btn secondary">Save</button>
+        <button id="downloadCodeBtn" class="btn secondary">Download</button>
+      </div>
+      <iframe id="codeFrame" style="flex:1;margin-top:8px;border-radius:8px;border:0;background:white;"></iframe>
+    </div>`;
+  const winId = createWindow({title:'Code Me', width:'800px', height:'600px', app:'codeme', content});
+  const win = state.windows[winId];
+  const code = win.querySelector('#codeArea');
+  const frame = win.querySelector('#codeFrame');
+
+  win.querySelector('#runCodeBtn').onclick = ()=> {
+    frame.srcdoc = code.value;
+  };
+  win.querySelector('#saveCodeBtn').onclick = ()=> {
+    const name = prompt('File name:', 'code_'+Date.now()+'.html');
+    if(name){
+      localStorage.setItem('file_'+name, code.value);
+      alert('Saved to VM Explorer: '+name);
+    }
+  };
+  win.querySelector('#downloadCodeBtn').onclick = ()=> {
+    const blob = new Blob([code.value], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='code.html'; a.click();
+    URL.revokeObjectURL(url);
+  };
+}
+
+</script>
+
+<!-- ===== PATCH 2/3: Kali boot sequence & helpers (JS) ===== -->
+<script>
+/* Kali helpers & boot sequence (PATCH 2) */
+
+function showKaliBoot(){
+  // show boot overlay
+  const root = document.getElementById('kaliRoot');
+  const boot = document.getElementById('kaliBootOverlay');
+  root.classList.remove('hidden'); root.setAttribute('aria-hidden','false');
+  boot.classList.remove('hidden'); boot.setAttribute('aria-hidden','false');
+  document.documentElement.classList.add('kali-mode');
+  document.body.classList.add('kali-wallpaper');
+
+  // animate progress
+  const fill = document.getElementById('kaliBootFill');
+  const text = document.getElementById('kaliBootText');
+  let steps = [
+    ['Loading kernel', 15],
+    ['Starting network', 35],
+    ['Mounting virtual FS', 60],
+    ['Initializing tools', 85],
+    ['Ready', 100]
+  ];
+  fill.style.width = '0%';
+  let i = 0;
+  function step(){
+    if(i >= steps.length){
+      // finish: hide boot and show desktop
+      setTimeout(()=> {
+        const kaliBoot = document.getElementById('kaliBootOverlay');
+        kaliBoot.style.display = "none";
+        boot.setAttribute('aria-hidden','true');
+        openKaliDesktop();
+      }, 500);
+      return;
+    }
+    const s = steps[i];
+    text.textContent = s[0];
+    fill.style.width = s[1] + '%';
+    i++;
+    setTimeout(step, 450);
+  }
+  step();
+}
+
+/* Create Kali desktop icons (called when opening Kali) */
+function createKaliIcons(){
+  const icons = [
+    {id:'k_term', label:'Terminal', action:'openKaliTerminal'},
+    {id:'k_nmap', label:'Nmap', action:'openKaliNmap'},
+    {id:'k_files', label:'Files', action:'openKaliFiles'},
+    {id:'k_editor', label:'Editor', action:'openEditor'}, // reuse VM editor
+    {id:'k_store', label:'Kali Tools', action:'openStore'}
+  ];
+  const cont = document.getElementById('kaliIcons');
+  cont.innerHTML = '';
+  icons.forEach(ic=>{
+    const d = document.createElement('div');
+    d.className = 'kali-icon';
+    d.style.width = '84px'; d.style.height = '84px'; d.style.display='flex'; d.style.flexDirection='column'; d.style.alignItems='center'; d.style.justifyContent='center';
+    d.innerHTML = `<div style="width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#013a5a,#003a6b);display:flex;align-items:center;justify-content:center;color:var(--kali-text);font-weight:700">${ic.label.slice(0,2)}</div><div style="font-size:12px;margin-top:6px;color:var(--kali-text)">${ic.label}</div>`;
+    d.onclick = ()=> {
+      if(window[ic.action]) window[ic.action]();
+      else alert('Not implemented: ' + ic.label);
+    };
+    cont.appendChild(d);
+  });
+  // populate dock
+  const dock = document.getElementById('kaliDock');
+  dock.innerHTML = '';
+  icons.slice(0,4).forEach(ic=>{
+    const b = document.createElement('div');
+    b.className = 'kali-icon';
+    b.style.margin = '0 6px';
+    b.innerHTML = `<div style="width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,#002b4a,#01466a);display:flex;align-items:center;justify-content:center;color:var(--kali-text);font-weight:700">${ic.label.slice(0,1)}</div>`;
+    b.title = ic.label;
+    b.onclick = ()=> { if(window[ic.action]) window[ic.action](); };
+    dock.appendChild(b);
+  });
+  dock.style.display = 'flex';
+}
+
+/* Show the Kali desktop (after boot) */
+function openKaliDesktop(){
+  const root = document.getElementById('kaliRoot');
+  const kaliDesktop = document.getElementById('kaliDesktop');
+  kaliDesktop.classList.remove('hidden'); kaliDesktop.setAttribute('aria-hidden','false');
+  createKaliIcons();
+  // hide main VM windows visually (but don't remove them)
+  for(const id in state.windows){
+    state.windows[id].style.display = 'none';
+  }
+  // set a flag
+  state.isKali = true;
+  document.getElementById('kaliRoot').style.zIndex = 9000;
+  // show small toast
+  console.info('Kali mode: desktop shown');
+}
+
+/* Exit Kali mode and restore VM */
+function exitKaliMode(){
+  const kaliDesktop = document.getElementById('kaliDesktop');
+  const root = document.getElementById('kaliRoot');
+  kaliDesktop.classList.add('hidden'); kaliDesktop.setAttribute('aria-hidden','true');
+  root.classList.add('hidden'); root.setAttribute('aria-hidden','true');
+  // restore VM windows
+  for(const id in state.windows){
+    state.windows[id].style.display = 'block';
+  }
+  document.documentElement.classList.remove('kali-mode');
+  document.body.classList.remove('kali-wallpaper');
+  state.isKali = false;
+  document.getElementById('kaliDock').style.display = 'none';
+  console.info('Exited Kali mode');
+}
+
+/* Convenience small functions (fake Kali tool openings) */
+function openKaliTerminal(){
+  // open a "Kali-styled" terminal window but reuse createWindow
+  const content = `<div style="display:flex;flex-direction:column;height:100%"><div id="kaliTermOut" class="kali-term">kali@vm:~$</div><div style="display:flex;gap:8px;margin-top:8px"><input id="kaliTermIn" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04);background:rgba(0,0,0,0.6);color:var(--kali-text)" placeholder="type (help)"><button class="btn">Run</button></div></div>`;
+  const winId = createWindow({title:'Kali Terminal', width:'760px', height:'480px', app:'kali-terminal', content});
+  const win = state.windows[winId];
+  const out = win.querySelector('#kaliTermOut');
+  const input = win.querySelector('#kaliTermIn');
+  const runBtn = win.querySelector('.btn');
+  runBtn.onclick = ()=> { const c=input.value.trim(); input.value=''; kaliTermExecute(c, out); };
+  input.addEventListener('keypress', (e)=> { if(e.key==='Enter'){ const c=input.value.trim(); input.value=''; kaliTermExecute(c,out); }});
+}
+
+/* Simulated Kali commands (fake, safe outputs) */
+function kaliTermExecute(cmd, outEl){
+  if(!cmd) return;
+  const d = document.createElement('div');
+  d.textContent = '> ' + cmd;
+  outEl.appendChild(d);
+  // basic simulated commands
+  const parts = cmd.split(' ');
+  const op = parts[0].toLowerCase();
+  if(op === 'help'){
+    outEl.appendChild(document.createElement('div')).textContent = 'Commands: help, ls, pwd, whoami, ifconfig, uname, nmap, apt';
+  } else if(op === 'ls'){
+    outEl.appendChild(document.createElement('div')).textContent = 'Desktop  Documents  Downloads  tools';
+  } else if(op === 'pwd'){
+    outEl.appendChild(document.createElement('div')).textContent = '/home/kali';
+  } else if(op === 'whoami'){
+    outEl.appendChild(document.createElement('div')).textContent = 'kali';
+  } else if(op === 'ifconfig'){
+    outEl.appendChild(document.createElement('div')).textContent = 'eth0: inet 192.168.0.42  netmask 255.255.255.0';
+  } else if(op === 'uname'){
+    outEl.appendChild(document.createElement('div')).textContent = 'Linux kali-vm 5.10.0-0-kali';
+  } else if(op === 'nmap'){
+    outEl.appendChild(document.createElement('div')).textContent = 'Nmap scan simulated: open ports: 22,80';
+  } else if(op === 'apt'){
+    outEl.appendChild(document.createElement('div')).textContent = 'This is a simulated apt. No packages actually installed.';
+  } else {
+    outEl.appendChild(document.createElement('div')).textContent = 'kali: command not found: ' + op;
+  }
+  outEl.scrollTop = outEl.scrollHeight;
+}
+
+/* Additional fake tools */
+function openKaliNmap(){ alert('Opening Nmap (simulated). Use Kali Terminal to run: nmap <host>'); }
+function openKaliWireless(){ alert('Opening wireless tools (simulated)'); }
+function openKaliFiles(){ openExplorer(); }
+
+/* Hook the Hey Kali button */
+document.addEventListener('click', (e)=>{
+  if(e.target && e.target.id === 'heyKaliBtn'){
+    if(state.isKali){ exitKaliMode(); } else { showKaliBoot(); }
+  }
+});
+
+/* END PATCH 2/3 */
+
+function openCodeMe(){
+  const content = `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <textarea id="codeArea" class="editor" style="flex:1;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="runCodeBtn" class="btn">Run</button>
+        <button id="saveCodeBtn" class="btn secondary">Save</button>
+        <button id="downloadCodeBtn" class="btn secondary">Download</button>
+      </div>
+      <iframe id="codeFrame" style="flex:1;margin-top:8px;border-radius:8px;border:0;background:white;"></iframe>
+    </div>`;
+  const winId = createWindow({title:'Code Me', width:'800px', height:'600px', app:'codeme', content});
+  const win = state.windows[winId];
+  const code = win.querySelector('#codeArea');
+  const frame = win.querySelector('#codeFrame');
+
+  win.querySelector('#runCodeBtn').onclick = ()=> {
+    frame.srcdoc = code.value;
+  };
+  win.querySelector('#saveCodeBtn').onclick = ()=> {
+    const name = prompt('File name:', 'code_'+Date.now()+'.html');
+    if(name){
+      localStorage.setItem('file_'+name, code.value);
+      alert('Saved to VM Explorer: '+name);
+    }
+  };
+  win.querySelector('#downloadCodeBtn').onclick = ()=> {
+    const blob = new Blob([code.value], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='code.html'; a.click();
+    URL.revokeObjectURL(url);
+  };
+}
+
+</script>
+
+<!-- ===== PATCH 3/3: Editor integration + runScript hook ===== -->
+<script>
+/* Patch integration: watch for editor commands and integrate with runScript safely */
+
+/* 1) Add editor comment command handler */
+function checkEditorKaliCommands(scriptText){
+  // If editor contains the special comment, trigger Kali open/exit
+  if(typeof scriptText !== 'string') return false;
+  if(scriptText.includes('//kali/:open')){
+    // Start Kali boot and switch
+    showKaliBoot();
+    return true;
+  }
+  if(scriptText.includes('//kali/:exit')){
+    exitKaliMode();
+    return true;
+  }
+  return false;
+}
+
+/* 2) Monkey-patch runScript if it exists — preserve original */
+if(typeof window.runScript === 'function'){
+  const _origRunScript = window.runScript;
+  window.runScript = async function(script, outEl){
+    // If script contains Kali commands, handle them first
+    if(checkEditorKaliCommands(script)){
+      // optionally log to outEl
+      if(outEl) {
+        const m = document.createElement('div');
+        m.textContent = '[Kali command detected — switching mode]';
+        outEl.appendChild(m);
+      }
+      // don't pass the kali comment to original runner
+      const cleaned = String(script).replace('//kali/:open','').replace('//kali/:exit','');
+      if(cleaned.trim()) await _origRunScript.call(this, cleaned, outEl);
+      return;
+    }
+    // otherwise fallback to original behavior
+    return await _origRunScript.call(this, script, outEl);
+  };
+} else {
+  // If runScript was not yet defined when patch runs, wait and patch later
+  window.addEventListener('load', ()=> {
+    if(typeof window.runScript === 'function' && !window.runScript.__kaliPatched){
+      const _orig = window.runScript;
+      window.runScript = async function(script, outEl){
+        if(checkEditorKaliCommands(script)){
+          if(outEl){ const m = document.createElement('div'); m.textContent = '[Kali command detected — switching mode]'; outEl.appendChild(m); }
+          const cleaned = String(script).replace('//kali/:open','').replace('//kali/:exit','');
+          if(cleaned.trim()) await _orig.call(this, cleaned, outEl);
+          return;
+        }
+        return await _orig.call(this, script, outEl);
+      };
+      window.runScript.__kaliPatched = true;
+    }
+  });
+}
+
+/* 3) Make Editor 'Save Script' or 'Run' also check for Kali command (optional but helpful) */
+document.addEventListener('click', (e)=>{
+  // When user clicks "Run Script" in the in-built editor, some versions created a button with id runScriptBtn
+  if(e.target && e.target.id === 'runScriptBtn'){
+    try {
+      // find the editor box in the currently active editor window if present
+      const win = document.getElementById(window_active_id);
+      const scriptBox = win ? win.querySelector('#scriptBox') : document.querySelector('#scriptBox');
+      const scriptText = scriptBox ? scriptBox.value : null;
+      if(scriptText && checkEditorKaliCommands(scriptText)){
+        // handled by patched runScript already; no further action required
+      }
+    } catch(err){ console.warn('Kali patch: run button hook failed', err); }
+  }
+});
+
+/* 4) Small helper: save a text file to Kali desktop (adds to Explorer) */
+function saveFileToKaliDesktop(name, data){
+  // This saves as a normal file in VM explorer (localStorage), but can be used as "Kali file"
+  if(!name) name = 'kali_file_' + Date.now() + '.txt';
+  localStorage.setItem('file_'+name, data || '');
+  alert('Saved file to Explorer: ' + name);
+}
+
+/* Final note: ensure the Hey Kali button is labelled and visible */
+(function ensureHeyKali(){
+  const btn = document.getElementById('heyKaliBtn');
+  if(btn) btn.title = 'Click to toggle Kali (Dragon Mode)';
+})();
+
+function openCodeMe(){
+  const content = `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <textarea id="codeArea" class="editor" style="flex:1;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="runCodeBtn" class="btn">Run</button>
+        <button id="saveCodeBtn" class="btn secondary">Save</button>
+        <button id="downloadCodeBtn" class="btn secondary">Download</button>
+      </div>
+      <iframe id="codeFrame" style="flex:1;margin-top:8px;border-radius:8px;border:0;background:white;"></iframe>
+    </div>`;
+  const winId = createWindow({title:'Code Me', width:'800px', height:'600px', app:'codeme', content});
+  const win = state.windows[winId];
+  const code = win.querySelector('#codeArea');
+  const frame = win.querySelector('#codeFrame');
+
+  win.querySelector('#runCodeBtn').onclick = ()=> {
+    frame.srcdoc = code.value;
+  };
+  win.querySelector('#saveCodeBtn').onclick = ()=> {
+    const name = prompt('File name:', 'code_'+Date.now()+'.html');
+    if(name){
+      localStorage.setItem('file_'+name, code.value);
+      alert('Saved to VM Explorer: '+name);
+    }
+  };
+  win.querySelector('#downloadCodeBtn').onclick = ()=> {
+    const blob = new Blob([code.value], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='code.html'; a.click();
+    URL.revokeObjectURL(url);
+  };
+}
+
+</script>
+
+</body>
+</html>
